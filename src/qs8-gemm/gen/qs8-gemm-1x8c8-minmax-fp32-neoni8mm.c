@@ -16,7 +16,7 @@
 #include <xnnpack/math.h>
 
 
-void xnn_qs8_qc8w_gemm_minmax_fp32_ukernel_1x8c8__neoni8mm(
+void xnn_qs8_gemm_minmax_fp32_ukernel_1x8c8__neoni8mm(
     size_t mr,
     size_t nc,
     size_t kc,
@@ -26,7 +26,7 @@ void xnn_qs8_qc8w_gemm_minmax_fp32_ukernel_1x8c8__neoni8mm(
     int8_t* restrict c,
     size_t cm_stride,
     size_t cn_stride,
-    const union xnn_qs8_qc8w_conv_minmax_params params[restrict XNN_MIN_ELEMENTS(1)]) XNN_OOB_READS
+    const union xnn_qs8_conv_minmax_params params[restrict XNN_MIN_ELEMENTS(1)]) XNN_OOB_READS
 {
   assert(mr != 0);
   assert(mr <= 1);
@@ -112,10 +112,9 @@ void xnn_qs8_qc8w_gemm_minmax_fp32_ukernel_1x8c8__neoni8mm(
     float32x4_t vfpacc0x0123 = vcvtq_f32_s32(vacc0x0123);
     float32x4_t vfpacc0x4567 = vcvtq_f32_s32(vacc0x4567);
 
-    const float32x4_t vscale0123 = vld1q_f32((const float*) w); w = (const float*) w + 4;
-    vfpacc0x0123 = vmulq_f32(vfpacc0x0123, vscale0123);
-    const float32x4_t vscale4567 = vld1q_f32((const float*) w); w = (const float*) w + 4;
-    vfpacc0x4567 = vmulq_f32(vfpacc0x4567, vscale4567);
+    const float32x4_t vscale = vld1q_dup_f32(&params->fp32_neonv8.scale);
+    vfpacc0x0123 = vmulq_f32(vfpacc0x0123, vscale);
+    vfpacc0x4567 = vmulq_f32(vfpacc0x4567, vscale);
 
     vacc0x0123 = vcvtnq_s32_f32(vfpacc0x0123);
     vacc0x4567 = vcvtnq_s32_f32(vfpacc0x4567);

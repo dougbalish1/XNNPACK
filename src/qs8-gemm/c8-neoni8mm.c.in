@@ -4,7 +4,6 @@
 // LICENSE file in the root directory of this source tree.
 
 $ABC = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-$assert MR % 2 == 0
 $assert NR % 4 == 0
 $assert 4 <= NR <= 16
 $assert REQUANTIZATION in ["FP32", "RNDNU"] or not REQUANTIZATION
@@ -104,6 +103,8 @@ void xnn_${DATATYPE_SPEC}_gemm_minmax${REQUANTIZATION_SPEC}_ukernel_${MR}x${NR}c
       // Load a ${MR}x16 block of activations.
       $for M in range(MR):
         const int8x16_t va${M}x${ABC[0:16]} = vld1q_s8(a${M}); a${M} += 16;
+      $if MR == 1:
+        const int8x16_t va1x${ABC[0:16]} = vmovq_n_s8(0);
       $for M in range(0, MR, 2):
         const int8x16_t va${M}${M+1}x${ABC[0:8]} = vreinterpretq_s8_u64(vtrn1q_u64(vreinterpretq_u64_s8(va${M}x${ABC[0:16]}), vreinterpretq_u64_s8(va${M+1}x${ABC[0:16]})));
         const int8x16_t va${M}${M+1}x${ABC[8:16]} = vreinterpretq_s8_u64(vtrn2q_u64(vreinterpretq_u64_s8(va${M}x${ABC[0:16]}), vreinterpretq_u64_s8(va${M+1}x${ABC[0:16]})));
@@ -130,6 +131,8 @@ void xnn_${DATATYPE_SPEC}_gemm_minmax${REQUANTIZATION_SPEC}_ukernel_${MR}x${NR}c
         // Load a ${MR}x8 block of activations.
         $for M in range(MR):
           const int8x8_t va${M}x${ABC[0:8]} = vld1_s8(a${M}); a${M} += 8;
+        $if MR == 1:
+          const int8x8_t va1x${ABC[0:8]} = vmov_n_s8(0);
         $for M in range(0, MR, 2):
           int8x16_t va${M}${M+1}x${ABC[0:8]} = vcombine_s8(va${M}x${ABC[0:8]}, va${M+1}x${ABC[0:8]});
 
@@ -145,10 +148,14 @@ void xnn_${DATATYPE_SPEC}_gemm_minmax${REQUANTIZATION_SPEC}_ukernel_${MR}x${NR}c
       } while (k != 0);
     }
 
-    $for M in range(0, MR, 2):
+    $if MR == 1:
       $for N in range(0, NR, 4):
-        int32x4_t vacc${M}x${ABC[N:N+4]} = vreinterpretq_s32_u64(vtrn1q_u64(vreinterpretq_u64_s32(vacc${M}${M+1}x${ABC[N:N+2]}), vreinterpretq_u64_s32(vacc${M}${M+1}x${ABC[N+2:N+4]})));
-        int32x4_t vacc${M+1}x${ABC[N:N+4]} = vreinterpretq_s32_u64(vtrn2q_u64(vreinterpretq_u64_s32(vacc${M}${M+1}x${ABC[N:N+2]}), vreinterpretq_u64_s32(vacc${M}${M+1}x${ABC[N+2:N+4]})));
+        int32x4_t vacc0x${ABC[N:N+4]} = vreinterpretq_s32_u64(vtrn1q_u64(vreinterpretq_u64_s32(vacc01x${ABC[N:N+2]}), vreinterpretq_u64_s32(vacc01x${ABC[N+2:N+4]})));
+    $else:
+      $for M in range(0, MR, 2):
+        $for N in range(0, NR, 4):
+          int32x4_t vacc${M}x${ABC[N:N+4]} = vreinterpretq_s32_u64(vtrn1q_u64(vreinterpretq_u64_s32(vacc${M}${M+1}x${ABC[N:N+2]}), vreinterpretq_u64_s32(vacc${M}${M+1}x${ABC[N+2:N+4]})));
+          int32x4_t vacc${M+1}x${ABC[N:N+4]} = vreinterpretq_s32_u64(vtrn2q_u64(vreinterpretq_u64_s32(vacc${M}${M+1}x${ABC[N:N+2]}), vreinterpretq_u64_s32(vacc${M}${M+1}x${ABC[N+2:N+4]})));
     $if DATATYPE == "QD8":
       $for M in range(0, MR):
         $for N in range(0, NR, 4):
